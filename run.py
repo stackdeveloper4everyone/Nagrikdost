@@ -33,7 +33,7 @@ def check_env():
 
 def start_api(port="8000"):
     """Start FastAPI server."""
-    print(f"🚀 Starting FastAPI backend on http://localhost:{port}")
+    print(f"Starting FastAPI backend on http://localhost:{port}")
     return subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "app.main:app",
          "--host", "0.0.0.0", "--port", str(port)],
@@ -56,7 +56,7 @@ def start_ui():
 
 def main():
     print("=" * 60)
-    print("  🏛️  NagrikMitra — Unified Citizen Interaction Assistant")
+    print("  NagrikMitra - Unified Citizen Interaction Assistant")
     print("  Powered by Sarvam AI Cloud")
     print("=" * 60)
     print()
@@ -72,7 +72,7 @@ def main():
     if "--api" in args or is_railway:
         processes.append(start_api(port=port))
         if is_railway:
-            print("🚂 Detected Railway Environment. Running ONLY the FastAPI backend.")
+            print("Detected Railway Environment. Running ONLY the FastAPI backend.")
     elif "--ui" in args:
         processes.append(start_ui())
     else:

@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Initialize services on startup, cleanup on shutdown."""
     logger.info("=" * 60)
-    logger.info("  NagrikMitra — Unified Citizen Interaction Assistant")
+    logger.info("  NagrikMitra - Unified Citizen Interaction Assistant")
     logger.info("=" * 60)
 
     # Initialize RAG engine and scheme service
@@ -83,6 +83,10 @@ app.add_middleware(
 
 # Mount mock government APIs
 app.include_router(mock_router)
+
+@app.get("/")
+async def root():
+    return {"message": "NagrikMitra API is running successfully!"}
 
 
 # ─── CHAT ENDPOINT ──────────────────────────────────────────────────
