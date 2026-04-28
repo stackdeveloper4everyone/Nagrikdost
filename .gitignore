@@ -1,0 +1,81 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Streamlit cache
+.streamlit/
+!.streamlit/config.toml
+.streamlit/secrets.toml
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Qdrant (vector DB)
+qdrant_storage/
+.qdrant/
+
+# Audio files (temporary)
+*.wav
+*.mp3
+
+# Media files
+.streamlit/cache/
+
+# Node modules (if any)
+node_modules/
+package-lock.json
+
+# Misc
+.DS_Store
+*.pem
+*.key
+*.crt

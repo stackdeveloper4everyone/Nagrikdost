@@ -1,0 +1,29 @@
+{
+  "name": "NagrikMitra",
+  "description": "AI-Powered Unified Multilingual Citizen Service Assistant",
+  "keywords": ["python", "fastapi", "streamlit", "ai", "government-services"],
+  "buildCommand": "pip install -r requirements.txt",
+  "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+  "envs": [
+    {
+      "name": "SARVAM_API_KEY",
+      "description": "Sarvam AI API Key",
+      "value": ""
+    },
+    {
+      "name": "SARVAM_BASE_URL",
+      "description": "Sarvam AI Base URL",
+      "value": "https://api.sarvam.ai"
+    },
+    {
+      "name": "TAVILY_API_KEY",
+      "description": "Tavily Search API Key",
+      "value": ""
+    },
+    {
+      "name": "LOG_LEVEL",
+      "description": "Log Level (debug, info, warning, error)",
+      "value": "info"
+    }
+  ]
+}
