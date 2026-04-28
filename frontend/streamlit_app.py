@@ -29,9 +29,9 @@ st.set_page_config(
 )
 
 try:
-    API_BASE = st.secrets.get("API_BASE", "http://localhost:8000")
+    API_BASE = st.secrets.get("API_BASE", "https://nagrikdost-production.up.railway.app")
 except:
-    API_BASE = os.environ.get("API_BASE", "http://localhost:8000")
+    API_BASE = os.environ.get("API_BASE", "https://nagrikdost-production.up.railway.app")
 
 # ─── CUSTOM CSS ──────────────────────────────────────────────────────
 
