@@ -14,5 +14,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Default: start both backend + frontend via run.py
-CMD ["python", "run.py"]
+# Default: start FastAPI backend
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
