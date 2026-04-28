@@ -31,12 +31,12 @@ def check_env():
             print("⚠️  No .env file found. Create one with SARVAM_API_KEY=your_key")
 
 
-def start_api():
+def start_api(port="8000"):
     """Start FastAPI server."""
-    print("🚀 Starting FastAPI backend on http://localhost:8000")
+    print(f"🚀 Starting FastAPI backend on http://localhost:{port}")
     return subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "app.main:app",
-         "--host", "0.0.0.0", "--port", "8000", "--reload"],
+         "--host", "0.0.0.0", "--port", str(port)],
         cwd=BASE_DIR,
     )
 
@@ -65,14 +65,19 @@ def main():
 
     args = sys.argv[1:]
     processes = []
+    
+    port = os.environ.get("PORT", "8000")
+    is_railway = "RAILWAY_ENVIRONMENT_NAME" in os.environ or "RAILWAY_PROJECT_ID" in os.environ or os.environ.get("PORT")
 
-    if "--api" in args:
-        processes.append(start_api())
+    if "--api" in args or is_railway:
+        processes.append(start_api(port=port))
+        if is_railway:
+            print("🚂 Detected Railway Environment. Running ONLY the FastAPI backend.")
     elif "--ui" in args:
         processes.append(start_ui())
     else:
-        # Start both
-        api_proc = start_api()
+        # Start both locally
+        api_proc = start_api(port=port)
         processes.append(api_proc)
         time.sleep(2)  # Let API start before UI
         ui_proc = start_ui()
@@ -80,7 +85,7 @@ def main():
 
         print()
         print("✅ Both servers running:")
-        print("   API:  http://localhost:8000/docs")
+        print(f"   API:  http://localhost:{port}/docs")
         print("   UI:   http://localhost:8501")
         print()
         print("Press Ctrl+C to stop both servers")
