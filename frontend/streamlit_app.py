@@ -11,6 +11,7 @@ import requests
 import json
 import base64
 import uuid
+import os
 from datetime import datetime
 
 # ─── PAGE CONFIG ──────────────────────────────────────────────────────
@@ -27,7 +28,10 @@ st.set_page_config(
     }
 )
 
-API_BASE = "http://localhost:8000"
+try:
+    API_BASE = st.secrets.get("API_BASE", "http://localhost:8000")
+except:
+    API_BASE = os.environ.get("API_BASE", "http://localhost:8000")
 
 # ─── CUSTOM CSS ──────────────────────────────────────────────────────
 
