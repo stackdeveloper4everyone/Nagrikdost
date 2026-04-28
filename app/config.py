@@ -44,8 +44,11 @@ class Settings(BaseSettings):
     MAX_TOKENS_SCHEME_DETAIL: int = 1500
     MAX_TOKENS_ELIGIBILITY: int = 1200
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
-
+    model_config = {
+        "env_file": ".env", 
+        "env_file_encoding": "utf-8",
+        "extra": "ignore"
+    }
 
 # Supported Indian languages with Sarvam language codes
 SUPPORTED_LANGUAGES: Dict[str, str] = {
