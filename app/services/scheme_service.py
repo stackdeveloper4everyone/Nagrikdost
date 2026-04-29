@@ -16,7 +16,7 @@ def load_schemes(data_dir: str = None):
     """Load schemes data from JSON."""
     global _schemes_data
     if data_dir is None:
-        data_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data")
+        data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
 
     schemes_path = os.path.join(data_dir, "schemes.json")
     try:

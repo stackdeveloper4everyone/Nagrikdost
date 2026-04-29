@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
     logger.info("=" * 60)
 
     # Initialize RAG engine and scheme service
-    data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
+    data_dir = os.path.join(os.path.dirname(__file__), "data")
     rag_engine.initialize_rag(data_dir)
     scheme_service.load_schemes(data_dir)
 
