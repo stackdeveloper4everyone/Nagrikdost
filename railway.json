@@ -1,9 +1,8 @@
 {
+  "$schema": "https://railway.app/railway.schema.json",
   "name": "NagrikMitra",
   "description": "AI-Powered Unified Multilingual Citizen Service Assistant",
   "keywords": ["python", "fastapi", "streamlit", "ai", "government-services"],
-  "buildCommand": "pip install -r requirements.txt",
-  "startCommand": "uvicorn app.main:app --host 0.0.0.0 --port $PORT",
   "envs": [
     {
       "name": "SARVAM_API_KEY",
