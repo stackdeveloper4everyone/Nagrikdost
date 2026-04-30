@@ -1,19 +1,15 @@
-"""Semantic cache using Qdrant vector database + sklearn embeddings.
+"""Semantic cache using simple in-memory dictionary + sklearn embeddings.
 
-Stores query-response pairs as vectors in Qdrant. On each new query,
-searches for semantically similar cached queries to avoid duplicate
-LLM calls. Uses sklearn HashingVectorizer for embeddings (no model
-download needed, works offline behind corporate proxies).
+Stores query-response pairs with vector similarity matching.
+Uses sklearn HashingVectorizer for embeddings (no model download needed).
+
+Falls back gracefully if dependencies are unavailable.
 """
 
 import logging
 import time
 import uuid
-from typing import Optional, Dict
-
-from qdrant_client import QdrantClient, models
-from sklearn.feature_extraction.text import HashingVectorizer
-import numpy as np
+from typing import Optional, Dict, List
 
 from app.config import settings
 
@@ -23,68 +19,74 @@ logger = logging.getLogger(__name__)
 EMBEDDING_DIM = 256
 
 # Module-level singletons (initialized in init())
-_client: Optional[QdrantClient] = None
-_vectorizer: Optional[HashingVectorizer] = None
+_vectorizer = None
+_cache_store: Dict[str, dict] = {}  # id -> {query, response, vector, timestamp}
+_initialized = False
 
 COLLECTION_NAME = "semantic_cache"
 
 
 def _embed(text: str) -> list:
     """Convert text to a dense vector using HashingVectorizer."""
-    vec = _vectorizer.transform([text.lower()])
-    dense = vec.toarray()[0]
-    # L2-normalize for cosine similarity
-    norm = np.linalg.norm(dense)
-    if norm > 0:
-        dense = dense / norm
-    return dense.tolist()
+    if _vectorizer is None:
+        return None
+    try:
+        import numpy as np
+        vec = _vectorizer.transform([text.lower()])
+        dense = vec.toarray()[0]
+        # L2-normalize for cosine similarity
+        norm = np.linalg.norm(dense)
+        if norm > 0:
+            dense = dense / norm
+        return dense.tolist()
+    except Exception as e:
+        logger.error(f"Embedding failed: {e}")
+        return None
+
+
+def _cosine_similarity(a: list, b: list) -> float:
+    """Compute cosine similarity between two vectors."""
+    try:
+        import numpy as np
+        a_arr = np.array(a)
+        b_arr = np.array(b)
+        dot = np.dot(a_arr, b_arr)
+        norm_a = np.linalg.norm(a_arr)
+        norm_b = np.linalg.norm(b_arr)
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
+        return float(dot / (norm_a * norm_b))
+    except Exception:
+        return 0.0
 
 
 def init(persist_path: str = None):
-    """Initialize Qdrant client and embedding vectorizer.
+    """Initialize embedding vectorizer and in-memory cache store.
 
-    Connection priority:
-      1. QDRANT_URL env var (external Qdrant server, e.g. Docker)
-      2. persist_path (local file-based storage)
-      3. In-memory mode (data lost on restart)
+    Uses a simple Python dictionary instead of Qdrant to minimize
+    memory usage and avoid embedded server overhead.
     """
-    global _client, _vectorizer
+    global _vectorizer, _initialized
 
-    # Initialize vectorizer (character + word n-grams for better semantic matching)
-    _vectorizer = HashingVectorizer(
-        n_features=EMBEDDING_DIM,
-        analyzer="char_wb",
-        ngram_range=(2, 4),
-        norm="l2",
-    )
-
-    # Initialize Qdrant client
-    if settings.QDRANT_URL:
-        _client = QdrantClient(url=settings.QDRANT_URL)
-        logger.info(f"Qdrant connected to external server: {settings.QDRANT_URL}")
-    elif persist_path:
-        _client = QdrantClient(path=persist_path)
-        logger.info(f"Qdrant initialized with persistent storage at: {persist_path}")
-    else:
-        _client = QdrantClient(":memory:")
-        logger.info("Qdrant initialized in-memory mode")
-
-    # Create collection if it doesn't exist
-    collections = [c.name for c in _client.get_collections().collections]
-    if COLLECTION_NAME not in collections:
-        _client.create_collection(
-            collection_name=COLLECTION_NAME,
-            vectors_config=models.VectorParams(
-                size=EMBEDDING_DIM,
-                distance=models.Distance.COSINE,
-            ),
+    try:
+        from sklearn.feature_extraction.text import HashingVectorizer
+        # Initialize vectorizer (character + word n-grams for better semantic matching)
+        _vectorizer = HashingVectorizer(
+            n_features=EMBEDDING_DIM,
+            analyzer="char_wb",
+            ngram_range=(2, 4),
+            norm="l2",
         )
-        logger.info(f"Created Qdrant collection '{COLLECTION_NAME}' (dim={EMBEDDING_DIM})")
-    else:
-        logger.info(f"Qdrant collection '{COLLECTION_NAME}' already exists")
+        logger.info("Semantic cache vectorizer initialized (sklearn HashingVectorizer)")
+    except ImportError:
+        logger.warning("scikit-learn not available — semantic cache will use exact matching only")
+        _vectorizer = None
+    except Exception as e:
+        logger.warning(f"Vectorizer init failed: {e} — semantic cache will use exact matching only")
+        _vectorizer = None
 
-    info = _client.get_collection(COLLECTION_NAME)
-    logger.info(f"Semantic cache ready — {info.points_count} cached entries")
+    _initialized = True
+    logger.info("Semantic cache ready (in-memory dict mode) — 0 cached entries")
 
 
 def check_cache(query: str) -> Optional[str]:
@@ -92,38 +94,42 @@ def check_cache(query: str) -> Optional[str]:
 
     Returns the cached response if similarity >= threshold and TTL hasn't expired.
     """
-    if _client is None:
+    if not _initialized or not _cache_store:
         return None
 
     try:
         query_vector = _embed(query)
+        now = time.time()
+        best_score = 0.0
+        best_response = None
+        expired_ids = []
 
-        results = _client.query_points(
-            collection_name=COLLECTION_NAME,
-            query=query_vector,
-            limit=1,
-            score_threshold=settings.CACHE_SIMILARITY_THRESHOLD,
-        ).points
+        for entry_id, entry in _cache_store.items():
+            # Check TTL
+            if now - entry.get("timestamp", 0) > settings.CACHE_TTL_SECONDS:
+                expired_ids.append(entry_id)
+                continue
 
-        if not results:
-            return None
+            # Try vector similarity if we have vectors
+            if query_vector and entry.get("vector"):
+                score = _cosine_similarity(query_vector, entry["vector"])
+                if score >= settings.CACHE_SIMILARITY_THRESHOLD and score > best_score:
+                    best_score = score
+                    best_response = entry.get("response")
+            # Fallback: exact match
+            elif query.lower().strip() == entry.get("query", "").lower().strip():
+                best_score = 1.0
+                best_response = entry.get("response")
 
-        point = results[0]
-        timestamp = point.payload.get("timestamp", 0)
-        score = point.score
+        # Cleanup expired entries
+        for eid in expired_ids:
+            _cache_store.pop(eid, None)
 
-        # Check TTL
-        if time.time() - timestamp > settings.CACHE_TTL_SECONDS:
-            # Expired — delete it
-            _client.delete(
-                collection_name=COLLECTION_NAME,
-                points_selector=models.PointIdsList(points=[point.id]),
-            )
-            logger.info(f"Cache expired for: '{query[:50]}...' (score={score:.3f})")
-            return None
+        if best_response:
+            logger.info(f"Semantic cache HIT: '{query[:50]}...' (score={best_score:.3f})")
+            return best_response
 
-        logger.info(f"Semantic cache HIT: '{query[:50]}...' (score={score:.3f})")
-        return point.payload.get("response")
+        return None
 
     except Exception as e:
         logger.error(f"Cache check error: {e}")
@@ -132,32 +138,23 @@ def check_cache(query: str) -> Optional[str]:
 
 def store_cache(query: str, response: str):
     """Store a query-response pair in the semantic cache."""
-    if _client is None:
+    if not _initialized:
         return
 
     try:
         query_vector = _embed(query)
-        point_id = str(uuid.uuid4())
+        entry_id = uuid.uuid4().hex[:12]
 
-        _client.upsert(
-            collection_name=COLLECTION_NAME,
-            points=[
-                models.PointStruct(
-                    id=point_id,
-                    vector=query_vector,
-                    payload={
-                        "query": query,
-                        "response": response,
-                        "timestamp": time.time(),
-                    },
-                )
-            ],
-        )
+        _cache_store[entry_id] = {
+            "query": query,
+            "response": response,
+            "vector": query_vector,
+            "timestamp": time.time(),
+        }
 
         # Enforce max cache size — delete oldest entries
-        info = _client.get_collection(COLLECTION_NAME)
-        if info.points_count > settings.CACHE_MAX_SIZE:
-            _evict_oldest(info.points_count - settings.CACHE_MAX_SIZE)
+        if len(_cache_store) > settings.CACHE_MAX_SIZE:
+            _evict_oldest(len(_cache_store) - settings.CACHE_MAX_SIZE)
 
         logger.info(f"Cached response for: '{query[:50]}...'")
 
@@ -168,36 +165,26 @@ def store_cache(query: str, response: str):
 def _evict_oldest(count: int):
     """Remove the oldest `count` entries from the cache."""
     try:
-        # Scroll all points, sorted by timestamp
-        records, _ = _client.scroll(
-            collection_name=COLLECTION_NAME,
-            limit=count,
-            order_by=models.OrderBy(key="timestamp", direction=models.Direction.ASC),
+        sorted_entries = sorted(
+            _cache_store.items(),
+            key=lambda x: x[1].get("timestamp", 0),
         )
-        if records:
-            ids = [r.id for r in records]
-            _client.delete(
-                collection_name=COLLECTION_NAME,
-                points_selector=models.PointIdsList(points=ids),
-            )
-            logger.info(f"Evicted {len(ids)} oldest cache entries")
+        for entry_id, _ in sorted_entries[:count]:
+            _cache_store.pop(entry_id, None)
+        logger.info(f"Evicted {count} oldest cache entries")
     except Exception as e:
         logger.warning(f"Cache eviction failed: {e}")
 
 
 def get_stats() -> Dict:
     """Return cache statistics."""
-    if _client is None:
+    if not _initialized:
         return {"status": "not_initialized", "total_cached": 0}
 
-    try:
-        info = _client.get_collection(COLLECTION_NAME)
-        return {
-            "status": "active",
-            "total_cached": info.points_count,
-            "vectors_count": info.vectors_count,
-            "similarity_threshold": settings.CACHE_SIMILARITY_THRESHOLD,
-            "ttl_seconds": settings.CACHE_TTL_SECONDS,
-        }
-    except Exception:
-        return {"status": "error", "total_cached": 0}
+    return {
+        "status": "active",
+        "total_cached": len(_cache_store),
+        "similarity_threshold": settings.CACHE_SIMILARITY_THRESHOLD,
+        "ttl_seconds": settings.CACHE_TTL_SECONDS,
+        "mode": "in-memory-dict",
+    }

@@ -50,12 +50,21 @@ async def lifespan(app: FastAPI):
 
     # Initialize RAG engine and scheme service
     data_dir = os.path.join(os.path.dirname(__file__), "data")
-    rag_engine.initialize_rag(data_dir)
-    scheme_service.load_schemes(data_dir)
+    try:
+        rag_engine.initialize_rag(data_dir)
+    except Exception as e:
+        logger.error(f"RAG engine init failed: {e}")
+    
+    try:
+        scheme_service.load_schemes(data_dir)
+    except Exception as e:
+        logger.error(f"Scheme service init failed: {e}")
 
-    # Initialize Qdrant semantic cache
-    persist_path = settings.QDRANT_PERSIST_PATH or None
-    semantic_cache.init(persist_path=persist_path)
+    # Initialize semantic cache
+    try:
+        semantic_cache.init()
+    except Exception as e:
+        logger.error(f"Semantic cache init failed: {e}")
 
     logger.info("All services initialized successfully")
     yield
