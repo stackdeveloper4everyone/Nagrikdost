@@ -18,5 +18,4 @@ COPY . .
 EXPOSE 8000
 
 # Start uvicorn — Railway sets $PORT at runtime
-# Use shell form so $PORT is expanded by the shell
-CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-keep-alive 120
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-keep-alive 120"]
