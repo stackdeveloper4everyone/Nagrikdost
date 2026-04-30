@@ -84,7 +84,7 @@ async def list_schemes(
     import json
     import os
 
-    data_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "schemes.json")
+    data_path = os.path.join(os.path.dirname(__file__), "..", "data", "schemes.json")
     try:
         with open(data_path, "r", encoding="utf-8") as f:
             schemes = json.load(f)
@@ -118,7 +118,7 @@ async def check_eligibility(data: dict):
     import json
     import os
 
-    data_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "schemes.json")
+    data_path = os.path.join(os.path.dirname(__file__), "..", "data", "schemes.json")
     try:
         with open(data_path, "r", encoding="utf-8") as f:
             schemes = json.load(f)
